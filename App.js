@@ -1,8 +1,11 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as React from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import * as MediaLibrary from "expo-media-library";
+import { captureRef } from "react-native-view-shot";
+import domtoimage from 'dom-to-image';
 
 import ImageViewer from './components/ImageViewer';
 import Button from './components/Button';
@@ -20,6 +23,12 @@ export default function App() {
   const [showAppOptions, setShowAppOptions] = React.useState(false)
   const [isModalVisible, setIsModalVisible] = React.useState(false)
   const [pickedEmoji, setPickedEmoji] = React.useState(null)
+  const [status, requestPermission] = MediaLibrary.usePermissions()
+  const imageRef = React.useRef()
+
+  if (status == null) {
+    requestPermission()
+  }
 
   const onReset = () => {
     setShowAppOptions(false);
@@ -35,7 +44,37 @@ export default function App() {
   }
 
   const onSaveImageAsync = async () => {
-    // we will implement this later
+    if (Platform.OS !== "web"){
+      try {
+        const localUri = await captureRef(imageRef, {
+          width: 440,
+          quality: 1
+        })
+
+        await MediaLibrary.saveToLibraryAsync(localUri);
+        if (localUri) {
+          alert("Saved")
+        }
+      } catch (error) {
+        console.log(error)
+      }
+    }
+    else {
+      try {
+        const dataUrl = await domtoimage.toJpeg(imageRef.current, {
+          quality: 0.95,
+          width: 320,
+          height: 440
+        })
+        let link = document.createElement("a")
+        link.download = "sticker-smash.jpeg"
+        link.href = dataUrl
+        link.click()
+      } catch (error) {
+        alert("ERROR: Failed to save image")
+        console.log(error)
+      }
+    }
   };
 
   const pickImageAsync = async () => {
@@ -56,11 +95,13 @@ export default function App() {
   return (
     <GestureHandlerRootView style={styles.container}>
       <View style={styles.imageContainer}>
-        <ImageViewer 
-          placeHolderImageSource={PlaceHolderImage} 
-          selectedImage={selectedImage}
-        />
-        { pickedEmoji && <EmojiSticker stickerSource={pickedEmoji} imageSize={40} /> }
+        <View ref={imageRef} collapsable={false}>
+          <ImageViewer 
+            placeHolderImageSource={PlaceHolderImage} 
+            selectedImage={selectedImage}
+          />
+          { pickedEmoji && <EmojiSticker stickerSource={pickedEmoji} imageSize={40} /> }
+        </View>
       </View>
       { showAppOptions 
         ?
